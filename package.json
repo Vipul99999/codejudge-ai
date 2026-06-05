@@ -1,14 +1,27 @@
 {
   "name": "codejudge-ai",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/contracts"
+  ],
   "scripts": {
-    "frontend:dev": "npm --prefix frontend run dev",
-    "frontend:build": "npm --prefix frontend run build",
-    "frontend:test": "npm --prefix frontend run test",
-    "backend:dev": "uvicorn app.main:app --app-dir backend --reload",
-    "backend:test": "pytest backend",
-    "test": "npm --prefix frontend run test && pytest backend"
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:api": "powershell -ExecutionPolicy Bypass -File tools/run-python.ps1 -m uvicorn app.main:app --app-dir apps/api --reload",
+    "build": "npm --prefix packages/contracts run build && npm --prefix apps/web run build",
+    "lint": "npm run lint:ts && npm run lint:api",
+    "lint:ts": "npm --prefix packages/contracts run lint && npm --prefix apps/web run lint",
+    "lint:api": "powershell -ExecutionPolicy Bypass -File tools/run-python.ps1 -m ruff check apps/api",
+    "format": "npm run format:ts && powershell -ExecutionPolicy Bypass -File tools/run-python.ps1 -m ruff format apps/api",
+    "format:check": "npm run format:ts:check && powershell -ExecutionPolicy Bypass -File tools/run-python.ps1 -m ruff format --check apps/api",
+    "format:ts": "prettier --write \"packages/**/*.ts\" \"apps/web/**/*.{ts,tsx}\"",
+    "format:ts:check": "prettier --check \"packages/**/*.ts\" \"apps/web/**/*.{ts,tsx}\"",
+    "typecheck": "npm --prefix packages/contracts run typecheck && npm --prefix apps/web run typecheck && powershell -ExecutionPolicy Bypass -File tools/run-python.ps1 -m mypy apps/api/app",
+    "test": "npm --prefix packages/contracts run test && npm --prefix apps/web run test && powershell -ExecutionPolicy Bypass -File tools/run-python.ps1 -m pytest apps/api/tests",
+    "verify": "npm run lint && npm run format:check && npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
   }
 }
-

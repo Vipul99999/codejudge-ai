@@ -1,28 +1,34 @@
 # Contributing
 
-## Development Rules
+## Principles
 
-- Do not add code execution for submitted programs.
-- Keep analyzers deterministic and explainable.
-- Include confidence, reason, and limitations for new evaluator outputs.
-- Add focused tests for every new analysis rule or API endpoint.
-- Keep frontend workflows dense, professional, and evaluator-oriented.
+CodeJudge AI is deterministic and static-analysis-only. Do not add code execution, remote LLM calls, model-generated judgment, or hidden scoring logic.
 
-## Backend
+Every evaluation result must expose score, confidence, evidence, limitations, detected patterns, findings, breakdown, and why.
 
-Add new rules inside `backend/app/analysis/` and keep the FastAPI route thin. Prefer structured Pydantic models over free-form dictionaries.
+## Monorepo
 
-## Frontend
+- `apps/api`: FastAPI backend and Python contracts.
+- `apps/web`: Next.js web workspace.
+- `packages/contracts`: shared TypeScript and Zod contracts.
+- `docs`: product, architecture, domain, API, and schema documentation.
+- `tests`: repo-level cross-workspace test strategy.
+- `tools`: local verification helpers.
 
-Add new evaluator modules in `frontend/src/lib/modules.ts`, then wire payload handling in `frontend/src/app/page.tsx`. Use the existing UI primitives in `frontend/src/components/ui/`.
+## Quality Gate
 
-## Testing
+Run before handing off work:
 
-Run backend and frontend tests before merging:
-
-```bash
-pytest backend
-npm --prefix frontend run test
-npm --prefix frontend run build
+```powershell
+npm run verify
 ```
 
+This checks linting, formatting, typing, and tests across the API, web app, and shared contracts.
+
+## Security
+
+- Never execute submitted code.
+- Never compile or import submitted code.
+- Never pass submitted content to a shell.
+- Never store secrets in source.
+- Keep user input escaped when rendered.

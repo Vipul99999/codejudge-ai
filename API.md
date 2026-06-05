@@ -1,94 +1,41 @@
 # API
 
-Base URL: `http://127.0.0.1:8000`
+Status: Phase 3 frozen contract summary.
 
-## Health
+The detailed API contract is maintained in [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md). Runtime endpoints are implemented only after the relevant deterministic engines exist. No route may return fabricated scores or model-generated judgment.
 
-`GET /health`
+## Base Rules
 
-Returns service status and confirms static-analysis-only mode.
+- CodeJudge AI never executes submitted code.
+- CodeJudge AI never calls LLM APIs for evaluation.
+- Every evaluation result must include score, confidence, evidence, limitations, detected patterns, findings, breakdown, and why.
+- Scores are bounded from 0 to 100 and must come from ASTs, parser trees, static rules, metrics, rubric weights, or deterministic heuristics.
+- Confidence is bounded from 0 to 1 and must explain uncertainty.
 
-## Code Analyzer
+## Resource Families
 
-`POST /api/analyze`
+- `GET /health`
+- `GET /ready`
+- `GET /metrics`
+- `POST /api/analysis/code-review`
+- `POST /api/analysis/bug-risk`
+- `POST /api/analysis/test-generation`
+- `POST /api/analysis/complexity`
+- `POST /api/analysis/compare`
+- `POST /api/analysis/ai-response`
+- `POST /api/analysis/reasoning`
+- `POST /api/rubrics`
+- `POST /api/rubrics/{rubric_id}/versions`
+- `GET /api/rubrics/{rubric_id}/versions/{version_id}`
+- `POST /api/datasets`
+- `POST /api/datasets/{dataset_id}/versions`
+- `GET /api/datasets/{dataset_id}/versions/{version_id}`
+- `GET /api/benchmarks`
+- `GET /api/benchmarks/events`
+- `POST /api/exports`
 
-```json
-{ "language": "python", "code": "def f(x):\n    return x + 1" }
-```
+## Source Of Truth
 
-Returns overall score, category scores, suggestions, risks, confidence, reason, and limitations.
-
-## Bug Detector
-
-`POST /api/bugs`
-
-Accepts the same payload as the code analyzer. Returns findings with severity, explanation, likely impact, recommended fix, and line where available.
-
-## Test Case Generator
-
-`POST /api/test-cases`
-
-Returns normal, edge, corner, and stress cases plus JSON and CSV exports.
-
-## Complexity Analyzer
-
-`POST /api/complexity`
-
-Returns time complexity, space complexity, explanation, and confidence score.
-
-## Solution Comparator
-
-`POST /api/compare`
-
-```json
-{ "language": "python", "solution_a": "def a(): pass", "solution_b": "def b(): pass" }
-```
-
-Returns winner, score breakdown, and summary.
-
-## LLM Code Evaluator
-
-`POST /api/llm-evaluate`
-
-```json
-{ "prompt": "Write a parser", "ai_response": "Use a finite-state parser...", "language": "python" }
-```
-
-Returns evaluator-style report, hallucination risks, and safety notes.
-
-## Reasoning Reviewer
-
-`POST /api/reasoning`
-
-```json
-{ "problem": "Assess two-sum correctness", "reasoning": "1. Assume..." }
-```
-
-Returns score, feedback, missing assumptions, and contradictions.
-
-## Dataset Builder
-
-`POST /api/dataset`
-
-```json
-{ "topic": "Array evaluation", "language": "python", "count": 5, "difficulty": "mixed", "tags": ["benchmark"] }
-```
-
-Returns generated dataset items with JSON and CSV exports.
-
-## Rubric Engine
-
-`POST /api/rubric`
-
-```json
-{ "categories": [{ "name": "correctness", "weight": 0.4, "score": 80 }] }
-```
-
-Returns normalized weights, weighted score, and interpretation.
-
-## Benchmark Dashboard
-
-`GET /api/benchmarks`
-
-Returns evaluations performed, average score, bug categories, complexity distribution, and module distribution.
-
+- Backend Pydantic contracts: `apps/api/app/contracts.py`
+- Shared TypeScript/Zod contracts: `packages/contracts/src/index.ts`
+- Domain model: `docs/DOMAIN_MODEL.md`

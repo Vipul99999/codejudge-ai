@@ -1,7 +1,7 @@
 services:
   backend:
     build:
-      context: ./backend
+      context: ./apps/api
     ports:
       - "8000:8000"
     healthcheck:
@@ -12,7 +12,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./apps/web
       args:
         NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
     environment:
@@ -22,4 +22,3 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-
