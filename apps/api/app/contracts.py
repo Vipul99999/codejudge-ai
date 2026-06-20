@@ -277,6 +277,41 @@ class ExportRequestDTO(ContractModel):
     format: ExportFormat
 
 
+class RubricScoreRequestDTO(ContractModel):
+    workspace_id: str = Field(min_length=1)
+    rubric: RubricVersionEntity
+    result: BaseEvaluationResultDTO
+
+
+class DatasetBuildRequestDTO(ContractModel):
+    workspace_id: str = Field(min_length=1)
+    topic: str = Field(min_length=2, max_length=160)
+    language: Language = Language.python
+    count: int = Field(default=5, ge=1, le=25)
+    difficulty: Difficulty = Difficulty.mixed
+    rubric_version_id: str = Field(min_length=1)
+    tags: list[str] = Field(default_factory=list, max_length=20)
+
+
+class DatasetBuildResultDTO(ContractModel):
+    result: BaseEvaluationResultDTO
+    items: list[DatasetItemEntity]
+    exports: dict[ExportFormat, str]
+
+
+class BenchmarkSummaryDTO(ContractModel):
+    workspace_id: str = Field(min_length=1)
+    evaluation_count: int = Field(ge=0)
+    average_score: Score
+    average_confidence: ConfidenceScore
+    failure_categories: dict[str, int]
+    language_distribution: dict[str, int]
+    evaluation_type_distribution: dict[str, int]
+    score_bands: dict[str, int]
+    latency_p95_ms: int = Field(ge=0)
+    generated_at: datetime
+
+
 class ApiErrorDTO(ContractModel):
     code: str = Field(min_length=1)
     message: str = Field(min_length=1)

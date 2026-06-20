@@ -18,6 +18,6 @@ def test_analyze_endpoint_records_benchmark() -> None:
     assert response.status_code == 200
     assert "overall_score" in response.json()
 
-    summary = client.get("/api/benchmarks")
+    summary = client.get("/api/benchmarks/legacy")
     assert summary.status_code == 200
     assert summary.json()["evaluations_performed"] >= 1

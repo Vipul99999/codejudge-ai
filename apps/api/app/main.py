@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.analysis.bug_detector import detect_bugs
@@ -12,6 +12,29 @@ from app.analysis.llm_evaluator import evaluate_llm_response
 from app.analysis.reasoning import review_reasoning
 from app.analysis.rubric import score_rubric
 from app.analysis.test_cases import generate_test_cases
+from app.contracts import (
+    AnalysisRequestDTO,
+    BaseEvaluationResultDTO,
+    BenchmarkSummaryDTO,
+    CodeArtifactDTO,
+    CompareSolutionsRequestDTO,
+    DatasetBuildRequestDTO,
+    DatasetBuildResultDTO,
+    EvaluationType,
+    Language,
+    PromptResponseArtifactDTO,
+    ReasoningArtifactDTO,
+    RubricScoreRequestDTO,
+)
+from app.engine.benchmark import Timer, benchmark_engine
+from app.engine.bug_detection import detect_bug_risks
+from app.engine.comparison import compare_solutions_contract
+from app.engine.complexity import analyze_complexity_contract
+from app.engine.dataset import build_dataset_contract
+from app.engine.rubric import apply_rubric
+from app.engine.static_analysis import analyze_static
+from app.engine.test_generation import generate_test_plan
+from app.engine.text_evaluation import evaluate_ai_response_contract, evaluate_reasoning_contract
 from app.models import (
     BenchmarkEvent,
     BenchmarkSummary,
@@ -72,6 +95,131 @@ def record(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "mode": "static-analysis-only"}
+
+
+def require_code_artifact(request: AnalysisRequestDTO) -> CodeArtifactDTO:
+    if not isinstance(request.artifact, CodeArtifactDTO):
+        raise HTTPException(status_code=422, detail="This analysis route requires a code artifact.")
+    return request.artifact
+
+
+def require_prompt_response_artifact(request: AnalysisRequestDTO) -> PromptResponseArtifactDTO:
+    if not isinstance(request.artifact, PromptResponseArtifactDTO):
+        raise HTTPException(
+            status_code=422,
+            detail="This analysis route requires a prompt-response artifact.",
+        )
+    return request.artifact
+
+
+def require_reasoning_artifact(request: AnalysisRequestDTO) -> ReasoningArtifactDTO:
+    if not isinstance(request.artifact, ReasoningArtifactDTO):
+        raise HTTPException(
+            status_code=422, detail="This analysis route requires a reasoning artifact."
+        )
+    return request.artifact
+
+
+def record_contract_result(
+    workspace_id: str,
+    result: BaseEvaluationResultDTO,
+    timer: Timer,
+    language: Language | None = None,
+) -> BaseEvaluationResultDTO:
+    benchmark_engine.record(workspace_id, result, timer.elapsed_ms(), language=language)
+    return result
+
+
+@app.post("/api/analysis/code-review", response_model=BaseEvaluationResultDTO)
+def code_review_contract_endpoint(request: AnalysisRequestDTO) -> BaseEvaluationResultDTO:
+    if request.evaluation_type != EvaluationType.code_review:
+        raise HTTPException(status_code=422, detail="evaluation_type must be code_review.")
+    timer = Timer()
+    artifact = require_code_artifact(request)
+    result = analyze_static(artifact, rubric_version_id=request.rubric_version_id)
+    return record_contract_result(request.workspace_id, result, timer, artifact.language)
+
+
+@app.post("/api/analysis/bug-risk", response_model=BaseEvaluationResultDTO)
+def bug_risk_contract_endpoint(request: AnalysisRequestDTO) -> BaseEvaluationResultDTO:
+    if request.evaluation_type != EvaluationType.bug_risk:
+        raise HTTPException(status_code=422, detail="evaluation_type must be bug_risk.")
+    timer = Timer()
+    artifact = require_code_artifact(request)
+    result = detect_bug_risks(artifact)
+    return record_contract_result(request.workspace_id, result, timer, artifact.language)
+
+
+@app.post("/api/analysis/test-generation", response_model=BaseEvaluationResultDTO)
+def test_generation_contract_endpoint(request: AnalysisRequestDTO) -> BaseEvaluationResultDTO:
+    if request.evaluation_type != EvaluationType.test_generation:
+        raise HTTPException(status_code=422, detail="evaluation_type must be test_generation.")
+    timer = Timer()
+    artifact = require_code_artifact(request)
+    result, _exports = generate_test_plan(artifact)
+    return record_contract_result(request.workspace_id, result, timer, artifact.language)
+
+
+@app.post("/api/analysis/complexity", response_model=BaseEvaluationResultDTO)
+def complexity_contract_endpoint(request: AnalysisRequestDTO) -> BaseEvaluationResultDTO:
+    if request.evaluation_type != EvaluationType.complexity:
+        raise HTTPException(status_code=422, detail="evaluation_type must be complexity.")
+    timer = Timer()
+    artifact = require_code_artifact(request)
+    result = analyze_complexity_contract(artifact)
+    return record_contract_result(request.workspace_id, result, timer, artifact.language)
+
+
+@app.post("/api/analysis/compare", response_model=BaseEvaluationResultDTO)
+def compare_contract_endpoint(request: CompareSolutionsRequestDTO) -> BaseEvaluationResultDTO:
+    timer = Timer()
+    result = compare_solutions_contract(request)
+    return record_contract_result(request.workspace_id, result, timer, request.language)
+
+
+@app.post("/api/analysis/ai-response", response_model=BaseEvaluationResultDTO)
+def ai_response_contract_endpoint(request: AnalysisRequestDTO) -> BaseEvaluationResultDTO:
+    if request.evaluation_type != EvaluationType.ai_response:
+        raise HTTPException(status_code=422, detail="evaluation_type must be ai_response.")
+    timer = Timer()
+    artifact = require_prompt_response_artifact(request)
+    result = evaluate_ai_response_contract(artifact)
+    return record_contract_result(request.workspace_id, result, timer, artifact.language)
+
+
+@app.post("/api/analysis/reasoning", response_model=BaseEvaluationResultDTO)
+def reasoning_contract_endpoint(request: AnalysisRequestDTO) -> BaseEvaluationResultDTO:
+    if request.evaluation_type != EvaluationType.reasoning:
+        raise HTTPException(status_code=422, detail="evaluation_type must be reasoning.")
+    timer = Timer()
+    artifact = require_reasoning_artifact(request)
+    result = evaluate_reasoning_contract(artifact)
+    return record_contract_result(request.workspace_id, result, timer)
+
+
+@app.post("/api/rubrics/score", response_model=BaseEvaluationResultDTO)
+def rubric_score_contract_endpoint(request: RubricScoreRequestDTO) -> BaseEvaluationResultDTO:
+    timer = Timer()
+    result = apply_rubric(request.result, request.rubric)
+    return record_contract_result(request.workspace_id, result, timer)
+
+
+@app.post("/api/datasets/build", response_model=DatasetBuildResultDTO)
+def dataset_build_contract_endpoint(request: DatasetBuildRequestDTO) -> DatasetBuildResultDTO:
+    timer = Timer()
+    result = build_dataset_contract(request)
+    benchmark_engine.record(
+        request.workspace_id,
+        result.result,
+        timer.elapsed_ms(),
+        language=request.language,
+    )
+    return result
+
+
+@app.get("/api/benchmarks", response_model=BenchmarkSummaryDTO)
+def benchmark_contract_endpoint(workspace_id: str = "workspace-default") -> BenchmarkSummaryDTO:
+    return benchmark_engine.summary(workspace_id)
 
 
 @app.post("/api/analyze", response_model=CodeAnalysisResponse)
@@ -145,6 +293,6 @@ def rubric_endpoint(request: RubricRequest) -> RubricResponse:
     return response
 
 
-@app.get("/api/benchmarks", response_model=BenchmarkSummary)
+@app.get("/api/benchmarks/legacy", response_model=BenchmarkSummary)
 def benchmark_endpoint() -> BenchmarkSummary:
     return benchmark_store.summary()
